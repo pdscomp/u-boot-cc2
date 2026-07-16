@@ -169,6 +169,54 @@
 #ifndef __ASSEMBLY__
 void clock_set_pll1(unsigned int hz);
 unsigned int clock_get_pll6(void);
+#ifdef CONFIG_VIDEO_DE2
+/* NCAT2 (R528/T113-S3) CCU register offsets */
+#define CCU_NCAT2_PLL_VIDEO0_CFG	0x040
+#define CCU_NCAT2_DE_CLK_CFG		0x600
+#define CCU_NCAT2_DE_GATE_RESET		0x60c
+#define CCU_NCAT2_DPSS_GATE_RESET	0xabc
+#define CCU_NCAT2_LCD0_CLK_CFG		0xb60
+#define CCU_NCAT2_LCD_GATE_RESET	0xb7c
+
+/*
+ * PLL_VIDEO0 bit fields -- CCU offset 0x040.
+ * Named PLL_VIDEO0 in the R528/T113 datasheet.
+ *
+ * freq_4x = 24MHz * N / (D1+1), freq_1x = freq_4x / 4
+ */
+#define CCM_PLL_VIDEO0_CTRL_EN		BIT(31)
+#define CCM_PLL_VIDEO0_LDO_EN		BIT(30)
+#define CCM_PLL_VIDEO0_LOCK_EN		BIT(29)
+#define CCM_PLL_VIDEO0_LOCK		BIT(28)
+#define CCM_PLL_VIDEO0_OUT_EN		BIT(27)
+#define CCM_PLL_VIDEO0_CTRL_N_SHIFT	8
+#define CCM_PLL_VIDEO0_CTRL_N_MASK	(0xff << CCM_PLL_VIDEO0_CTRL_N_SHIFT)
+#define CCM_PLL_VIDEO0_CTRL_N(n)	(((n) - 1) << CCM_PLL_VIDEO0_CTRL_N_SHIFT)
+#define CCM_PLL_VIDEO0_CTRL_D1_SHIFT	1
+#define CCM_PLL_VIDEO0_CTRL_D1(d)	(((d) & 1) << CCM_PLL_VIDEO0_CTRL_D1_SHIFT)
+
+/* Bus gate/reset bits (shared layout: BIT(16)=reset, BIT(0)=gate) */
+#define CCM_BUS_GATE			BIT(GATE_SHIFT)
+#define CCM_BUS_RESET			BIT(RESET_SHIFT)
+
+/* DE clock config -- offset 0x600 */
+#define CCM_DE2_CTRL_PLL_MASK		(7 << 24)
+#define CCM_DE2_CTRL_PLL_VIDEO0_4X	(1 << 24)
+#define CCM_DE2_CTRL_GATE		BIT(31)
+#define CCM_DE2_CTRL_M(n)		(((n) - 1) & 0x1f)
+#define CCM_DE2_CTRL_M_MASK		0x1f
+
+/* TCON_LCD0 clock config -- offset 0xb60 */
+#define CCM_LCD_CH0_CTRL_GATE		BIT(31)
+#define CCM_LCD_CH0_CTRL_RST		0	/* no reset bit in NCAT2 tcon_lcd0_clk_cfg */
+#define CCM_LCD_CH0_CTRL_PLL3		(0x0 << 24)	/* mux 0: pll-video0 (1x) */
+#define CCM_LCD_CH0_CTRL_PLL3_2X	(0x1 << 24)	/* mux 1: pll-video0-4x */
+#define CCM_LCD_CH0_CTRL_MIPI_PLL	0		/* No MIPI PLL on NCAT2 */
+#define CCM_LCD_CH0_CTRL_M(m)		(((m) - 1) & 0xf)
+
+void clock_set_pll3(unsigned int hz);
+unsigned int clock_get_pll3(void);
+#endif /* CONFIG_VIDEO_DE2 */
 #endif
 
 #endif /* _SUNXI_CLOCK_SUN50I_H6_H */

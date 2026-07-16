@@ -215,6 +215,7 @@ obj-$(CONFIG_CMD_VBE) += vbe.o
 obj-$(CONFIG_CMD_XIMG) += ximg.o
 obj-$(CONFIG_CMD_XXD) += xxd.o
 obj-$(CONFIG_CMD_SPL) += spl.o
+obj-$(CONFIG_CMD_SUNXI_EFEX) += sunxi_efex.o
 obj-$(CONFIG_CMD_W1) += w1.o
 obj-$(CONFIG_CMD_ZIP) += zip.o
 obj-$(CONFIG_CMD_ZFS) += zfs.o

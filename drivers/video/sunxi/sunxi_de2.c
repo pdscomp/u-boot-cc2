@@ -25,8 +25,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 enum {
 	/* Maximum LCD size we support */
-	LCD_MAX_WIDTH		= 3840,
-	LCD_MAX_HEIGHT		= 2160,
+	LCD_MAX_WIDTH		= 480,
+	LCD_MAX_HEIGHT		= 272,
 	LCD_MAX_LOG2_BPP	= VIDEO_BPP32,
 };
 
@@ -34,6 +34,42 @@ static void sunxi_de2_composer_init(void)
 {
 	struct sunxi_ccm_reg * const ccm =
 		(struct sunxi_ccm_reg *)SUNXI_CCM_BASE;
+
+#ifdef CONFIG_SUNXI_GEN_NCAT2
+	/*
+	 * R528/T113-S3 (NCAT2) display clock init.
+	 *
+	 * PLL_VIDEO0 must be running before we can use it as DE clock
+	 * source.  Program it now for the 1x output = 63 MHz (matching
+	 * Linux: pll-video0-4x = 252 MHz, pll-video0 = 63 MHz).
+	 *
+	 * lcdc_pll_set() will later verify/adjust the PLL if needed for
+	 * the target pixel clock, but the PLL parameters for 9 MHz panel
+	 * (N=21, D1=1) won't change.
+	 *
+	 * DE clock: pll-video0-4x (252 MHz) / 4 = 63 MHz (mux=1, M=4).
+	 * Matches Linux register 0x81000003.
+	 */
+	{
+		void *const ccm_base = (void *)SUNXI_CCM_BASE;
+
+		clock_set_pll3(63000000);
+
+		/* DE bus: deassert reset, enable gate (offset 0x60c) */
+		setbits_le32(ccm_base + CCU_NCAT2_DE_GATE_RESET, CCM_BUS_RESET);
+		setbits_le32(ccm_base + CCU_NCAT2_DE_GATE_RESET, CCM_BUS_GATE);
+
+		/* DPSS_TOP bus: deassert reset, enable gate (offset 0xabc) */
+		setbits_le32(ccm_base + CCU_NCAT2_DPSS_GATE_RESET, CCM_BUS_RESET);
+		setbits_le32(ccm_base + CCU_NCAT2_DPSS_GATE_RESET, CCM_BUS_GATE);
+
+		/* DE clock: pll_video0_4x / 4 = 63 MHz */
+		clrsetbits_le32(ccm_base + CCU_NCAT2_DE_CLK_CFG,
+				CCM_DE2_CTRL_PLL_MASK | CCM_DE2_CTRL_M_MASK,
+				CCM_DE2_CTRL_PLL_VIDEO0_4X | CCM_DE2_CTRL_M(4));
+		setbits_le32(ccm_base + CCU_NCAT2_DE_CLK_CFG, CCM_DE2_CTRL_GATE);
+	}
+#else /* !CONFIG_SUNXI_GEN_NCAT2 */
 
 #ifdef CONFIG_MACH_SUN50I
 	u32 reg_value;
@@ -56,6 +92,7 @@ static void sunxi_de2_composer_init(void)
 
 	/* Clock on */
 	setbits_le32(&ccm->de_clk_cfg, CCM_DE2_CTRL_GATE);
+#endif /* CONFIG_SUNXI_GEN_NCAT2 */
 }
 
 static void sunxi_de2_mode_set(int mux, const struct display_timing *mode,
@@ -252,6 +289,7 @@ static int sunxi_de2_probe(struct udevice *dev)
 
 	debug("%s: lcd display not found (ret=%d)\n", __func__, ret);
 
+#if IS_ENABLED(CONFIG_VIDEO_DW_HDMI)
 	ret = uclass_get_device_by_driver(UCLASS_DISPLAY,
 					  DM_DRIVER_GET(sunxi_dw_hdmi), &disp);
 	if (!ret) {
@@ -270,6 +308,7 @@ static int sunxi_de2_probe(struct udevice *dev)
 	}
 
 	debug("%s: hdmi display not found (ret=%d)\n", __func__, ret);
+#endif /* CONFIG_VIDEO_DW_HDMI */
 
 	return -ENODEV;
 }
@@ -332,6 +371,7 @@ int sunxi_simplefb_setup(void *blob)
 		return 0;
 	}
 
+#if IS_ENABLED(CONFIG_VIDEO_DW_HDMI)
 	ret = uclass_get_device_by_driver(UCLASS_DISPLAY,
 					  DM_DRIVER_GET(sunxi_dw_hdmi), &hdmi);
 	if (ret) {
@@ -344,6 +384,7 @@ int sunxi_simplefb_setup(void *blob)
 	} else {
 		debug("HDMI present but not probed\n");
 	}
+#endif /* CONFIG_VIDEO_DW_HDMI */
 
 	ret = uclass_get_device_by_driver(UCLASS_DISPLAY,
 					  DM_DRIVER_GET(sunxi_lcd), &lcd);

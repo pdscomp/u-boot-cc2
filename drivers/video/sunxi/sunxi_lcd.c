@@ -7,8 +7,8 @@
 
 #include <display.h>
 #include <log.h>
+#include <panel.h>
 #include <video_bridge.h>
-#include <backlight.h>
 #include <dm.h>
 #include <edid.h>
 #include <asm/io.h>
@@ -21,15 +21,28 @@
 struct sunxi_lcd_priv {
 	struct display_timing timing;
 	int panel_bpp;
+	bool rb_swap;
 };
 
 static void sunxi_lcdc_config_pinmux(void)
 {
-#ifdef CONFIG_MACH_SUN50I
+#if defined(CONFIG_MACH_SUN50I)
 	int pin;
 
 	for (pin = SUNXI_GPD(0); pin <= SUNXI_GPD(21); pin++) {
 		sunxi_gpio_set_cfgpin(pin, SUNXI_GPD_LCD0);
+		sunxi_gpio_set_drv(pin, 3);
+	}
+
+#elif defined(CONFIG_MACH_SUN8I_R528)
+	int pin;
+
+	for (pin = SUNXI_GPD(0); pin <= SUNXI_GPD(21); pin++) {
+		sunxi_gpio_set_cfgpin(pin, SUNXI_GPD_LCD0);
+		sunxi_gpio_set_drv(pin, 3);
+	}
+	for (pin = SUNXI_GPB(2); pin <= SUNXI_GPB(7); pin++) {
+		sunxi_gpio_set_cfgpin(pin, 2);
 		sunxi_gpio_set_drv(pin, 3);
 	}
 #endif
@@ -43,13 +56,28 @@ static int sunxi_lcd_enable(struct udevice *dev, int bpp,
 	struct sunxi_lcdc_reg * const lcdc =
 	       (struct sunxi_lcdc_reg *)SUNXI_LCD0_BASE;
 	struct sunxi_lcd_priv *priv = dev_get_priv(dev);
-	struct udevice *backlight;
+	struct udevice *panel;
 	int clk_div, clk_double, ret;
 
+	/*
+	 * LCD bus gate and reset.  On NCAT2 (R528/T113-S3) the gate/reset
+	 * registers follow the H6-era CCM layout (tcon_lcd_gate_reset at
+	 * offset 0xb7c).  On older SoCs the sun6i-era ahb_reset1_cfg /
+	 * ahb_gate1 fields are used instead.
+	 */
+#ifdef CONFIG_SUNXI_GEN_NCAT2
+	{
+		void *const ccm_base = (void *)SUNXI_CCM_BASE;
+
+		setbits_le32(ccm_base + CCU_NCAT2_LCD_GATE_RESET, CCM_BUS_RESET);
+		setbits_le32(ccm_base + CCU_NCAT2_LCD_GATE_RESET, CCM_BUS_GATE);
+	}
+#else
 	/* Reset off */
 	setbits_le32(&ccm->ahb_reset1_cfg, 1 << AHB_RESET_OFFSET_LCD0);
 	/* Clock on */
 	setbits_le32(&ccm->ahb_gate1, 1 << AHB_GATE_OFFSET_LCD0);
+#endif
 
 	lcdc_init(lcdc);
 	sunxi_lcdc_config_pinmux();
@@ -57,11 +85,17 @@ static int sunxi_lcd_enable(struct udevice *dev, int bpp,
 		     &clk_div, &clk_double, false);
 	lcdc_tcon0_mode_set(lcdc, edid, clk_div, false,
 			    priv->panel_bpp, CONFIG_VIDEO_LCD_DCLK_PHASE);
+	if (priv->rb_swap)
+		setbits_le32(&lcdc->tcon0_ctrl,
+			     SUNXI_LCDC_TCON0_CTRL_RB_SWAP);
+	else
+		clrbits_le32(&lcdc->tcon0_ctrl,
+			     SUNXI_LCDC_TCON0_CTRL_RB_SWAP);
 	lcdc_enable(lcdc, priv->panel_bpp);
 
-	ret = uclass_get_device(UCLASS_PANEL_BACKLIGHT, 0, &backlight);
+	ret = uclass_get_device(UCLASS_PANEL, 0, &panel);
 	if (!ret)
-		backlight_enable(backlight);
+		panel_enable_backlight(panel);
 
 	return 0;
 }
@@ -129,6 +163,8 @@ static int sunxi_lcd_probe(struct udevice *dev)
 	else
 		priv->panel_bpp = 18;
 
+	priv->rb_swap = fdtdec_get_bool(gd->fdt_blob, node, "rb-swap");
+
 	return 0;
 }
 
@@ -145,7 +181,7 @@ U_BOOT_DRIVER(sunxi_lcd) = {
 	.priv_auto	= sizeof(struct sunxi_lcd_priv),
 };
 
-#ifdef CONFIG_MACH_SUN50I
+#if defined(CONFIG_MACH_SUN50I) || defined(CONFIG_MACH_SUN8I_R528)
 U_BOOT_DRVINFO(sunxi_lcd) = {
 	.name = "sunxi_lcd"
 };

@@ -262,3 +262,91 @@ unsigned int clock_get_pll6(void)
 
 	return 24000000U * n / m / div1 / div2;
 }
+
+#ifdef CONFIG_VIDEO_DE2
+/*
+ * Display clock functions for R528/T113-S3 (SUNXI_GEN_NCAT2).
+ *
+ * PLL3 (VIDEO0, CCM offset 0x040) drives the display pipeline.
+ * The DE clock is sourced from PLL_VIDEO0_4X via the DE_CLK_REG mux.
+ * The TCON_LCD0 clock is sourced from PLL_VIDEO0 (1x) or PLL_VIDEO0_4X.
+ *
+ * PLL layout (same for all R528 PLLs):
+ *   EN(31), LDO_EN(30), LOCK_EN(29), LOCK(28), OUT_EN(27)
+ *   freq_4x = 24MHz * N / (D1+1), freq_1x = freq_4x / 4
+ */
+
+#define PLL_LOCK_TIMEOUT_US 1000
+
+void clock_set_pll3(unsigned int clk)
+{
+	void *const ccm = (void *)SUNXI_CCM_BASE;
+	int i;
+
+	if (clk == 0) {
+		clrbits_le32(ccm + CCU_NCAT2_PLL_VIDEO0_CFG, CCM_PLL_VIDEO0_CTRL_EN);
+		return;
+	}
+
+	/*
+	 * PLL_VIDEO0 on R528/T113 has: freq_4x = 24MHz * N / (D1+1)
+	 * where N is in bits[15:8] (stored as N-1) and D1 is in bit[1].
+	 *
+	 * The 1x output (pll-video0) is freq_4x / 4.
+	 *
+	 * For simplicity: if the requested clock is divisible by 24MHz,
+	 * use D1=0 (divide-by-1). Otherwise try D1=1 (divide-by-2) so
+	 * that the effective multiplier can be a half-integer of 24MHz.
+	 *
+	 * clk is the desired 1x output frequency in Hz.
+	 */
+	int n;
+	int d1 = 0;
+
+	/* Try D1=0 first: freq_1x = 24*N/4, so N = freq_1x*4/24 */
+	n = (int)((unsigned long)clk * 4 / 24000000);
+	if (n < 1)
+		n = 1;
+	if (n > 255)
+		n = 255;
+
+	/* Check if D1=1 gives a better match: freq_1x = 24*N/2/4 = 24*N/8 */
+	{
+		int n2 = (int)((unsigned long)clk * 8 / 24000000);
+		unsigned int err0 = abs((int)(24000000UL * n / 4 - clk));
+		unsigned int err1 = (n2 >= 1 && n2 <= 255) ?
+			abs((int)(24000000UL * n2 / 8 - clk)) : 0xFFFFFFFF;
+		if (err1 < err0) {
+			n = n2;
+			d1 = 1;
+		}
+	}
+
+	/* Enable PLL with lock detection, but without output yet */
+	writel(CCM_PLL_VIDEO0_CTRL_EN | CCM_PLL_VIDEO0_LDO_EN |
+	       CCM_PLL_VIDEO0_LOCK_EN |
+	       CCM_PLL_VIDEO0_CTRL_N(n) | CCM_PLL_VIDEO0_CTRL_D1(d1),
+	       ccm + CCU_NCAT2_PLL_VIDEO0_CFG);
+
+	/* Wait for PLL to lock */
+	for (i = 0; i < PLL_LOCK_TIMEOUT_US; i++) {
+		if (readl(ccm + CCU_NCAT2_PLL_VIDEO0_CFG) & CCM_PLL_VIDEO0_LOCK)
+			break;
+		udelay(1);
+	}
+
+	/* Enable PLL output */
+	setbits_le32(ccm + CCU_NCAT2_PLL_VIDEO0_CFG, CCM_PLL_VIDEO0_OUT_EN);
+}
+
+unsigned int clock_get_pll3(void)
+{
+	void *const ccm = (void *)SUNXI_CCM_BASE;
+	uint32_t rval = readl(ccm + CCU_NCAT2_PLL_VIDEO0_CFG);
+	int n = ((rval & CCM_PLL_VIDEO0_CTRL_N_MASK) >> CCM_PLL_VIDEO0_CTRL_N_SHIFT) + 1;
+	int d1 = ((rval >> CCM_PLL_VIDEO0_CTRL_D1_SHIFT) & 1) + 1;
+
+	/* Returns the 1x output: 24MHz * N / D1 / 4 */
+	return 24000000U * n / d1 / 4;
+}
+#endif /* CONFIG_VIDEO_DE2 */

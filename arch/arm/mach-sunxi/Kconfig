@@ -473,6 +473,7 @@ config MACH_SUN8I_R528
 	select SUNXI_GEN_NCAT2
 	select SUNXI_NEW_PINCTRL
 	select MMC_SUNXI_HAS_NEW_MODE
+	select SUNXI_DE2
 	select SUPPORT_SPL
 	select DRAM_SUN20I_D1
 	imply OF_UPSTREAM
@@ -1114,7 +1115,7 @@ config VIDEO_DE2
 	depends on SUNXI_DE2
 	select VIDEO
 	select DISPLAY
-	select VIDEO_DW_HDMI
+	imply VIDEO_DW_HDMI
 	imply VIDEO_DT_SIMPLEFB
 	default y
 	---help---

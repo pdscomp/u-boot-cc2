@@ -21,6 +21,7 @@
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
+#include <asm/arch/efex.h>
 #include <asm/arch/spl.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/timer.h>
@@ -482,6 +483,69 @@ void board_init_f(ulong dummy)
 
 	spl_init();
 	preloader_console_init();
+
+	/*
+	 * The stock Allwinner boot0 jumps back into the boot ROM FEL
+	 * routine when the FEL flag is set in the RTC data registers
+	 * (see the 'efex' command). The boot ROM does not check the
+	 * flag itself, so do it here. Skip the check when already
+	 * booted via FEL.
+	 */
+#ifdef CONFIG_CMD_SUNXI_EFEX
+	if (sunxi_get_boot_device() != BOOT_DEVICE_BOARD &&
+	    sunxi_probe_fel_flag()) {
+		void (*fel_entry)(void) = (void *)SUNXI_FEL_ENTRY;
+		u32 sctlr;
+
+		sunxi_clear_fel_flag();
+		printf("FEL flag set, jumping to FEL...\n");
+
+		/*
+		 * Mux the CPU, PSI/AHB and APB2 clocks back to OSC24M
+		 * like boot0's sunxi_board_clock_reset() does: the boot
+		 * ROM FEL routine does not cope with the PLL-clocked
+		 * state set up by clock_init().
+		 */
+		clrbits_le32(SUNXI_CCM_BASE + CCU_H6_PSI_AHB1_AHB2_CFG,
+			     0x03000303);
+		clrbits_le32(SUNXI_CCM_BASE + CCU_H6_APB1_CFG, 0x03000303);
+		writel(CCM_CPU_AXI_MUX_OSC24M | CCM_CPU_AXI_DEFAULT_FACTORS,
+		       SUNXI_CCM_BASE + CCU_H6_CPU_AXI_CFG);
+		DSB;
+
+		/*
+		 * Restore the SCTLR bits that cpu_init_cp15() changed
+		 * to the state boot0_entry.S leaves them in: alignment
+		 * checking and the icache off, branch prediction on.
+		 * sunxi-fel refuses to talk to a FEL mode that has
+		 * SCTLR.A set ("Unexpected SCTLR").
+		 */
+		asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (sctlr));
+		sctlr &= ~(CR_V | CR_I | CR_A);
+		sctlr |= CR_Z;
+		asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (sctlr));
+		ISB;
+
+		/* invalidate the now-disabled icache */
+		asm volatile("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
+
+		/*
+		 * Point VBAR back at the boot ROM vector table. The boot
+		 * ROM FEL routine is interrupt driven (see fel_stash
+		 * above) and relies on its own exception vectors, which
+		 * boot0 never touches, while cpu_init_cp15() pointed
+		 * VBAR at the SPL's vectors.
+		 */
+		asm volatile("mcr p15, 0, %0, c12, c0, 0" : : "r" (0));
+
+		/* invalidate the branch predictor, as boot0_jmp() does */
+		asm volatile("mcr p15, 0, %0, c7, c5, 6" : : "r" (0) : "memory");
+		DSB;
+		ISB;
+
+		fel_entry();
+	}
+#endif
 
 #if CONFIG_IS_ENABLED(I2C) && CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
 	/* Needed early by sunxi_board_init if PMU is enabled */

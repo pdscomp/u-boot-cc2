@@ -676,7 +676,8 @@ static void mctl_phy_ac_remapping(const dram_para_t *para,
 			case 8: cfg = ac_remapping_tables[2]; break;
 			case 9: cfg = ac_remapping_tables[3]; break;
 			case 10: cfg = ac_remapping_tables[5]; break;
-			case 11: cfg = ac_remapping_tables[4]; break;
+			case 11:
+			case 15: cfg = ac_remapping_tables[4]; break;
 			default:
 			case 12: cfg = ac_remapping_tables[1]; break;
 			case 13:

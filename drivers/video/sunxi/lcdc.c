@@ -212,6 +212,78 @@ void lcdc_tcon1_mode_set(struct sunxi_lcdc_reg * const lcdc,
 void lcdc_pll_set(struct sunxi_ccm_reg *ccm, int tcon, int dotclock,
 		  int *clk_div, int *clk_double, bool is_composite)
 {
+#ifdef CONFIG_SUNXI_GEN_NCAT2
+	/*
+	 * R528/T113 clock tree for LCD:
+	 *
+	 *   PLL_VIDEO0: freq_4x = 24MHz * N / (D1+1)
+	 *   pll-video0 (1x) = freq_4x / 4
+	 *
+	 *   TCON_LCD0 CCU mux:
+	 *     mux=0 → pll-video0 (1x)    divided by M (1..16)
+	 *     mux=1 → pll-video0-4x (4x) divided by M (1..16)
+	 *
+	 *   TCON internal dclk divider: always 1 on NCAT2
+	 *
+	 * Strategy: search for (N, D1, mux_4x, M) that gives best match.
+	 * Return clk_div=1 so lcdc_tcon0_mode_set() uses TCON dclk div=1.
+	 */
+	{
+		const unsigned long pll1x = 63000UL;
+		const unsigned long pll4x = pll1x * 4;
+		int m;
+		int best_diff = 0x7fffffff;
+		int best_m = 7;
+		int best_mux4x = 0;
+
+		for (m = 1; m <= 16; m++) {
+			int val = pll1x / m;
+			int diff = abs(dotclock - val);
+			if (diff < best_diff) {
+				best_diff = diff;
+				best_m = m;
+				best_mux4x = 0;
+			}
+
+			val = pll4x / m;
+			diff = abs(dotclock - val);
+			if (diff < best_diff) {
+				best_diff = diff;
+				best_m = m;
+				best_mux4x = 1;
+			}
+		}
+
+		/*
+		 * PLL_VIDEO0 is already programmed by sunxi_de2_composer_init()
+		 * via clock_set_pll3(). Do not reprogram it here - just set up
+		 * the TCON_LCD0 CCU mux and M divider.
+		 */
+
+		/* Program TCON_LCD0 CCU clock: gate + mux + M divider */
+		if (tcon == 0) {
+			void *const ccm_base = (void *)SUNXI_CCM_BASE;
+			u32 mux = best_mux4x ? CCM_LCD_CH0_CTRL_PLL3_2X :
+						CCM_LCD_CH0_CTRL_PLL3;
+			writel(CCM_LCD_CH0_CTRL_GATE | mux |
+			       CCM_LCD_CH0_CTRL_M(best_m),
+			       ccm_base + CCU_NCAT2_LCD0_CLK_CFG);
+		}
+
+		debug("dotclock: %dkHz = %dkHz: PLL_VIDEO0 fixed 1x=%lukHz "
+		      "(4x=%lukHz) mux=%s CCU_M=%d\n",
+		      dotclock,
+		      best_mux4x ? (int)(pll4x / best_m) : (int)(pll1x / best_m),
+		      pll1x, pll4x,
+		      best_mux4x ? "4x" : "1x", best_m);
+
+		/* Return clk_div=1 for TCON internal dclk (all division in CCU) */
+		*clk_div = 1;
+		*clk_double = best_mux4x;
+		return;
+	}
+#else
+
 	int value, n, m, min_m, max_m, diff, step;
 	int best_n = 0, best_m = 0, best_diff = 0x0FFFFFFF;
 	int best_double = 0;
@@ -332,4 +404,5 @@ void lcdc_pll_set(struct sunxi_ccm_reg *ccm, int tcon, int dotclock,
 
 	*clk_div = best_m;
 	*clk_double = best_double;
+#endif
 }

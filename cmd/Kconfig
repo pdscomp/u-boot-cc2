@@ -599,6 +599,15 @@ config SYS_XIMG_LEN
 	  It should be large enough to fit uncompressed size of
 	  FIT piece we are extracting.
 
+config CMD_SUNXI_EFEX
+	bool "efex - reboot into Allwinner FEL (USB boot ROM) mode"
+	depends on SUNXI_GEN_NCAT2 || SUN50I_GEN_H6
+	help
+	  Set the FEL flag in the RTC general purpose data registers and
+	  reset the board. The boot ROM checks this flag and enters FEL
+	  (USB boot) mode, allowing the device to be flashed over USB with
+	  tools such as sunxi-fel or xfel.
+
 config CMD_SPL
 	bool "spl export - Export boot information for Falcon boot"
 	depends on SPL

@@ -77,6 +77,7 @@ struct sunxi_lcdc_reg {
 #define SUNXI_LCDC_TCON0_FRM_TAB3		0x7f7f7777
 #define SUNXI_LCDC_TCON0_CTRL_CLK_DELAY(n)	(((n) & 0x1f) << 4)
 #define SUNXI_LCDC_TCON0_CTRL_ENABLE		(1 << 31)
+#define SUNXI_LCDC_TCON0_CTRL_RB_SWAP		(1 << 23)
 #define SUNXI_LCDC_TCON0_DCLK_DIV(n)		((n) << 0)
 #define SUNXI_LCDC_TCON0_DCLK_ENABLE		(0xf << 28)
 #define SUNXI_LCDC_TCON0_TIMING_H_BP(n)		(((n) - 1) << 0)
@@ -123,6 +124,7 @@ void lcdc_tcon0_mode_set(struct sunxi_lcdc_reg * const lcdc,
 void lcdc_tcon1_mode_set(struct sunxi_lcdc_reg * const lcdc,
 			 const struct display_timing *mode,
 			 bool ext_hvsync, bool is_composite);
+struct sunxi_ccm_reg;
 void lcdc_pll_set(struct sunxi_ccm_reg * const ccm, int tcon,
 		  int dotclock, int *clk_div, int *clk_double,
 		  bool is_composite);
