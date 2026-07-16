@@ -142,43 +142,43 @@
 };
 
 &dsi {
-	pinctrl-names = "default";
-	pinctrl-0 = <&dsi_4lane_pins>;
 	status = "okay";
-
-	panel@0 {
-		/* ===== CHANGE THIS to match your actual panel ===== */
-		compatible = "simple-panel";
-		reg = <0>;
-		backlight = <&backlight>;
-		enable-gpios = <&pio 1 8 GPIO_ACTIVE_HIGH>; /* PB8 - panel enable */
-		power-supply = <&reg_3v3>;
-
-		display-timings {
-			native-mode = <&timing0>;
-			timing0: timing0 {
-				clock-frequency = <20000000>;
-				hactive = <532>;
-				vactive = <300>;
-				hback-porch = <80>;
-				hfront-porch = <98>;
-				hsync-len = <4>;
-				vback-porch = <20>;
-				vfront-porch = <138>;
-				vsync-len = <4>;
-			};
-		};
-
-		port {
-			panel_in: endpoint {
-				remote-endpoint = <&dsi_out_panel>;
-			};
-		};
-	};
 
 	port {
 		dsi_out_panel: endpoint {
 			remote-endpoint = <&panel_in>;
+		};
+	};
+};
+
+/ {
+	soc {
+		panel@0 {
+			compatible = "sitronix,st77922";
+			reg = <0>;
+			reset-gpios = <&pio 1 8 GPIO_ACTIVE_LOW>; /* PB8 - panel reset */
+			backlight = <&backlight>;
+
+			display-timings {
+				native-mode = <&timing0>;
+				timing0: timing0 {
+					clock-frequency = <20000000>;
+					hactive = <532>;
+					vactive = <300>;
+					hback-porch = <84>;
+					hfront-porch = <94>;
+					hsync-len = <4>;
+					vback-porch = <24>;
+					vfront-porch = <134>;
+					vsync-len = <4>;
+				};
+			};
+
+			port {
+				panel_in: endpoint {
+					remote-endpoint = <&dsi_out_panel>;
+				};
+			};
 		};
 	};
 };

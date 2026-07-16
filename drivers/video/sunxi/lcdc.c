@@ -229,12 +229,21 @@ void lcdc_pll_set(struct sunxi_ccm_reg *ccm, int tcon, int dotclock,
 	 * Return clk_div=1 so lcdc_tcon0_mode_set() uses TCON dclk div=1.
 	 */
 	{
-		const unsigned long pll1x = 63000UL;
-		const unsigned long pll4x = pll1x * 4;
+		unsigned long pll1x;
+		unsigned long pll4x;
 		int m;
 		int best_diff = 0x7fffffff;
-		int best_m = 7;
+		int best_m = 1;
 		int best_mux4x = 0;
+
+		/*
+		 * Program PLL_VIDEO0 for this output instead of keeping the
+		 * early DE setup value. For DSI the requested dotclock is the
+		 * TCON byte-transfer clock, not the panel pixel clock.
+		 */
+		clock_set_pll3(dotclock * 1000);
+		pll1x = clock_get_pll3() / 1000;
+		pll4x = pll1x * 4;
 
 		for (m = 1; m <= 16; m++) {
 			int val = pll1x / m;
@@ -254,12 +263,6 @@ void lcdc_pll_set(struct sunxi_ccm_reg *ccm, int tcon, int dotclock,
 			}
 		}
 
-		/*
-		 * PLL_VIDEO0 is already programmed by sunxi_de2_composer_init()
-		 * via clock_set_pll3(). Do not reprogram it here - just set up
-		 * the TCON_LCD0 CCU mux and M divider.
-		 */
-
 		/* Program TCON_LCD0 CCU clock: gate + mux + M divider */
 		if (tcon == 0) {
 			void *const ccm_base = (void *)SUNXI_CCM_BASE;
@@ -270,7 +273,7 @@ void lcdc_pll_set(struct sunxi_ccm_reg *ccm, int tcon, int dotclock,
 			       ccm_base + CCU_NCAT2_LCD0_CLK_CFG);
 		}
 
-		debug("dotclock: %dkHz = %dkHz: PLL_VIDEO0 fixed 1x=%lukHz "
+		debug("dotclock: %dkHz = %dkHz: PLL_VIDEO0 1x=%lukHz "
 		      "(4x=%lukHz) mux=%s CCU_M=%d\n",
 		      dotclock,
 		      best_mux4x ? (int)(pll4x / best_m) : (int)(pll1x / best_m),

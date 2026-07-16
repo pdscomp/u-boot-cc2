@@ -94,3 +94,5 @@ obj-$(CONFIG_VIDEO_ZYNQMP_DPSUB) += zynqmp/
 obj-y += bridge/
 obj-y += sunxi/
 obj-y += tegra/
+
+obj-$(CONFIG_VIDEO_PANEL_SITRONIX_ST77922) += panel-sitronix-st77922.o

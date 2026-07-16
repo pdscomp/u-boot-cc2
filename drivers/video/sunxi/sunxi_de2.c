@@ -25,8 +25,8 @@ DECLARE_GLOBAL_DATA_PTR;
 
 enum {
 	/* Maximum LCD size we support */
-	LCD_MAX_WIDTH		= 480,
-	LCD_MAX_HEIGHT		= 272,
+	LCD_MAX_WIDTH		= 532,
+	LCD_MAX_HEIGHT		= 300,
 	LCD_MAX_LOG2_BPP	= VIDEO_BPP32,
 };
 

@@ -50,9 +50,17 @@ struct sunxi_lcdc_reg {
 	u8 res3[0x44];			/* 0xac */
 	u32 tcon1_io_polarity;		/* 0xf0 */
 	u32 tcon1_io_tristate;		/* 0xf4 */
-	u8 res4[0x108];			/* 0xf8 */
+	u32 tcon0_ecc_fifo;		/* 0xf8 */
+	u8 res4[0x64];			/* 0xfc */
+	u32 tcon0_cpu_tri0;		/* 0x160 */
+	u32 tcon0_cpu_tri1;		/* 0x164 */
+	u32 tcon0_cpu_tri2;		/* 0x168 */
+	u32 tcon0_cpu_tri3;		/* 0x16c */
+	u8 res5[0x80];			/* 0x170 */
+	u32 tcon_safe_period;		/* 0x1f0 */
+	u8 res6[0xc];			/* 0x1f4 */
 	u32 mux_ctrl;			/* 0x200 */
-	u8 res5[0x1c];			/* 0x204 */
+	u8 res7[0x1c];			/* 0x204 */
 	u32 lvds_ana0;			/* 0x220 */
 	u32 lvds_ana1;			/* 0x224 */
 };

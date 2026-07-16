@@ -1411,3 +1411,19 @@ config SPL_HIDE_LOGO_VERSION
 endif
 
 endmenu
+
+config VIDEO_PANEL_SITRONIX_ST77922
+	bool "Sitronix ST77922 MIPI-DSI panel"
+	depends on VIDEO_MIPI_DSI
+	default y if MACH_SUN8I_R528
+	help
+	  Enable support for the Sitronix ST77922 MIPI-DSI panel used on
+	  the Elegoo Centauri Carbon 2.
+
+config VIDEO_SUNXI_MIPI_DSI
+	bool "Allwinner sun6i/sun50i MIPI-DSI host"
+	depends on VIDEO_MIPI_DSI
+	default y if MACH_SUN8I_R528
+	help
+	  Enable support for the Allwinner sun6i and sun50i-family MIPI-DSI
+	  host controller used on SoCs such as T113/R528.
